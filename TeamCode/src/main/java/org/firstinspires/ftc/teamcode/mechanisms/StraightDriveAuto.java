@@ -5,7 +5,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
-import org.firstinspires.ftc.teamcode.Mechanism.TestBench;
+import org.firstinspires.ftc.teamcode.mechanisms.TestBench;
 import org.firstinspires.ftc.teamcode.mechanisms.TestBenchIMU;
 
 @Autonomous(name="IMU Straight Drive Auto", group="Autonomous")

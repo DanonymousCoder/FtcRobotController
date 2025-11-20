@@ -1,9 +1,9 @@
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode.mechanisms;
 
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
-import org.firstinspires.ftc.teamcode.Mechanism.TestBench;
+import org.firstinspires.ftc.teamcode.mechanisms.TestBench;
 import org.firstinspires.ftc.teamcode.mechanisms.TestBenchIMU;
 
 @TeleOp
