@@ -4,56 +4,66 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
 
 public class CameraServo {
-    private Servo panServo;    // Left/Right rotation
-    private Servo tiltServo;   // Up/Down rotation (optional)
+    private Servo panServo;
+    private Servo tiltServo;
 
-    // Servo position limits (adjust based on your servo's range)
-    private final double PAN_MIN = 0.0;    // Leftmost position
-    private final double PAN_MAX = 1.0;    // Rightmost position
-    private final double PAN_CENTER = 0.5; // Center position
+    // Servo position limits
+    private final double PAN_MIN = 0.0;
+    private final double PAN_MAX = 1.0;
+    private final double PAN_CENTER = 0.5;
 
-    private final double TILT_MIN = 0.0;   // Down position
-    private final double TILT_MAX = 1.0;   // Up position
+    private final double TILT_MIN = 0.0;
+    private final double TILT_MAX = 1.0;
     private final double TILT_CENTER = 0.5;
 
-    // Current servo positions
     private double currentPan = PAN_CENTER;
     private double currentTilt = TILT_CENTER;
 
+    // Track if servos are initialized
+    private boolean panServoInitialized = false;
+    private boolean tiltServoInitialized = false;
+
     /**
-     * Initialize servo hardware
-     * @param hwMap Hardware map from OpMode
+     * Initialize servo hardware with error handling
      */
     public void init(HardwareMap hwMap) {
-        // Get servo from hardware map
-        panServo = hwMap.get(Servo.class, "camera_pan");
-
-        // Optional: If you have a tilt servo
-        // tiltServo = hwMap.get(Servo.class, "camera_tilt");
-
-        // Set to center position
-        centerCamera();
+        try {
+            panServo = hwMap.get(Servo.class, "servo");
+            panServoInitialized = true;
+            centerCamera();
+        } catch (IllegalArgumentException e) {
+            panServoInitialized = false;
+            throw new RuntimeException("SERVO CONFIG ERROR: Servo 'camera_pan' not found in configuration! Please add it in Robot Configuration. Error: " + e.getMessage());
+        }
     }
 
     /**
-     * Initialize with both pan and tilt servos
+     * Initialize with optional tilt servo
      */
     public void init(HardwareMap hwMap, boolean useTilt) {
-        panServo = hwMap.get(Servo.class, "camera_pan");
+        // Initialize pan servo
+        init(hwMap);
 
+        // Try to initialize tilt servo if requested
         if (useTilt) {
-            tiltServo = hwMap.get(Servo.class, "camera_tilt");
+            try {
+                tiltServo = hwMap.get(Servo.class, "servo");
+                tiltServoInitialized = true;
+            } catch (IllegalArgumentException e) {
+                tiltServoInitialized = false;
+                // Don't throw error for tilt - it's optional
+            }
         }
-
-        centerCamera();
     }
 
     /**
      * Set pan servo position (left/right)
-     * @param position 0.0 (left) to 1.0 (right)
      */
     public void setPan(double position) {
-        // Clamp to valid range
+        if (!panServoInitialized || panServo == null) {
+            return; // Silently fail if servo not available
+        }
+
         position = Math.max(PAN_MIN, Math.min(PAN_MAX, position));
         currentPan = position;
         panServo.setPosition(position);
@@ -61,88 +71,71 @@ public class CameraServo {
 
     /**
      * Set tilt servo position (up/down)
-     * @param position 0.0 (down) to 1.0 (up)
      */
     public void setTilt(double position) {
-        if (tiltServo != null) {
-            position = Math.max(TILT_MIN, Math.min(TILT_MAX, position));
-            currentTilt = position;
-            tiltServo.setPosition(position);
+        if (!tiltServoInitialized || tiltServo == null) {
+            return;
         }
+
+        position = Math.max(TILT_MIN, Math.min(TILT_MAX, position));
+        currentTilt = position;
+        tiltServo.setPosition(position);
     }
 
     /**
-     * Adjust pan by a small amount (for tracking)
-     * @param delta Amount to change (-1.0 to 1.0)
+     * Adjust pan by delta amount
      */
     public void adjustPan(double delta) {
         setPan(currentPan + delta);
     }
 
     /**
-     * Adjust tilt by a small amount
-     * @param delta Amount to change (-1.0 to 1.0)
+     * Adjust tilt by delta amount
      */
     public void adjustTilt(double delta) {
         setTilt(currentTilt + delta);
     }
 
     /**
-     * Center the camera (point straight ahead)
+     * Center the camera
      */
     public void centerCamera() {
         setPan(PAN_CENTER);
-        setTilt(TILT_CENTER);
-    }
-
-    /**
-     * Point camera at specific angle
-     * @param bearing Horizontal angle in degrees (-90 to +90)
-     */
-    public void pointAtAngle(double bearing) {
-        // Convert bearing angle to servo position
-        // bearing = 0° → center (0.5)
-        // bearing = -90° → full left (0.0)
-        // bearing = +90° → full right (1.0)
-
-        // Scale: -90° to +90° maps to 0.0 to 1.0
-        double position = 0.5 + (bearing / 180.0);
-        setPan(position);
+        if (tiltServoInitialized) {
+            setTilt(TILT_CENTER);
+        }
     }
 
     /**
      * Track AprilTag with proportional control
-     * @param bearing Horizontal angle to tag
-     * @param range Distance to tag (for tilt calculation)
-     * @param gain Control sensitivity (0.01 to 0.05 recommended)
      */
     public void trackTag(double bearing, double range, double gain) {
-        // Calculate servo adjustment based on bearing error
-        double panAdjustment = bearing * gain;
+        if (!panServoInitialized) {
+            return;
+        }
 
-        // Smooth tracking - adjust current position slightly
+        // Don't adjust if already centered (within 2 degrees)
+        if (Math.abs(bearing) < 2.0) {
+            return;
+        }
+
+        double panAdjustment = bearing * gain;
         adjustPan(panAdjustment);
 
-        // Optional: Calculate tilt based on distance
-        if (tiltServo != null) {
-            // Closer tag = look down, farther = look straight
+        // Optional tilt adjustment based on range
+        if (tiltServoInitialized && range > 0) {
             double tiltPosition = calculateTiltFromRange(range);
             setTilt(tiltPosition);
         }
     }
 
     /**
-     * Calculate tilt angle based on distance to tag
-     * @param range Distance in inches
-     * @return Servo position (0.0 to 1.0)
+     * Calculate tilt based on distance
      */
     private double calculateTiltFromRange(double range) {
-        // Example: Close tags need camera tilted down
-        // Adjust these values based on your camera mount height
-
-        if (range < 12.0) {
-            return 0.3;  // Look down
-        } else if (range < 36.0) {
+        if (range < 30.0) {
+            return 0.3;  // Look down for close objects
+        } else if (range < 90.0) {
             return 0.5;  // Look straight
         } else {
             return 0.6;  // Look slightly up
@@ -150,9 +143,19 @@ public class CameraServo {
     }
 
     // Getters
-    public double getCurrentPan() { return currentPan; }
-    public double getCurrentTilt() { return currentTilt; }
+    public double getCurrentPan() {
+        return currentPan;
+    }
 
-    public boolean isAtLeftLimit() { return currentPan <= PAN_MIN + 0.01; }
-    public boolean isAtRightLimit() { return currentPan >= PAN_MAX - 0.01; }
+    public double getCurrentTilt() {
+        return currentTilt;
+    }
+
+    public boolean isPanInitialized() {
+        return panServoInitialized;
+    }
+
+    public boolean isTiltInitialized() {
+        return tiltServoInitialized;
+    }
 }

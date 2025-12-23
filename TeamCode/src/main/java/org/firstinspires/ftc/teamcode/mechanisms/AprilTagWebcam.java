@@ -1,118 +1,81 @@
 package org.firstinspires.ftc.teamcode.mechanisms;
 
+import android.util.Size;
+
+// REMOVE THIS LINE: @Autonomous(name = "AprilTagWebcam", group = "AprilTag")
 import com.qualcomm.robotcore.hardware.HardwareMap;
+
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 
+import java.util.ArrayList;
 import java.util.List;
 
+// NO @Autonomous HERE - this is just a helper class!
 public class AprilTagWebcam {
-
     private AprilTagProcessor aprilTagProcessor;
     private VisionPortal visionPortal;
+    private List<AprilTagDetection> detectedTags = new ArrayList<>();
     private Telemetry telemetry;
 
-    /**
-     * Initialize with HardwareMap and Telemetry
-     */
     public void init(HardwareMap hwMap, Telemetry telemetry) {
         this.telemetry = telemetry;
 
-        // Create AprilTag processor
         aprilTagProcessor = new AprilTagProcessor.Builder()
+                .setDrawTagID(true)
+                .setDrawTagOutline(true)
                 .setDrawAxes(true)
                 .setDrawCubeProjection(true)
-                .setDrawTagOutline(true)
+                .setOutputUnits(DistanceUnit.CM, AngleUnit.DEGREES)
                 .build();
 
-        // Create vision portal with webcam
-        visionPortal = new VisionPortal.Builder()
-                .setCamera(hwMap.get(WebcamName.class, "Webcam 1"))
-                .addProcessor(aprilTagProcessor)
-                .build();
+        VisionPortal.Builder builder = new VisionPortal.Builder();
+        builder.setCamera(hwMap.get(WebcamName.class, "Webcam 1"));
+        builder.setCameraResolution(new Size(640, 480));
+        builder.addProcessor(aprilTagProcessor);
 
-        if (telemetry != null) {
-            telemetry.addData("AprilTag Camera", "Initialized");
-        }
+        visionPortal = builder.build();
     }
 
-    /**
-     * Initialize with just HardwareMap (backwards compatible)
-     */
-    public void init(HardwareMap hwMap) {
-        init(hwMap, null);
-    }
-
-    /**
-     * Update detections (call every loop)
-     */
     public void update() {
-        // Processor automatically updates detections
-        // This method exists for future enhancements
+        detectedTags = aprilTagProcessor.getDetections();
     }
 
-    /**
-     * Get all detected AprilTags
-     */
-    public List<AprilTagDetection> getAllDetections() {
-        if (aprilTagProcessor != null) {
-            return aprilTagProcessor.getDetections();
+    public List<AprilTagDetection> getDetectedTags() {
+        return detectedTags;
+    }
+
+    public void displayDetectionTelemetry(AprilTagDetection detectedId) {
+        if (detectedId == null) return;
+
+        if (detectedId.metadata != null) {
+            telemetry.addLine(String.format("\n==== (ID %d) %s", detectedId.id, detectedId.metadata.name));
+            telemetry.addLine(String.format("XYZ %6.1f %6.1f %6.1f  (inch)", detectedId.ftcPose.x, detectedId.ftcPose.y, detectedId.ftcPose.z));
+            telemetry.addLine(String.format("PRY %6.1f %6.1f %6.1f  (deg)", detectedId.ftcPose.pitch, detectedId.ftcPose.roll, detectedId.ftcPose.yaw));
+            telemetry.addLine(String.format("RBE %6.1f %6.1f %6.1f  (inch, deg, deg)", detectedId.ftcPose.range, detectedId.ftcPose.bearing, detectedId.ftcPose.elevation));
+        } else {
+            telemetry.addLine(String.format("\n==== (ID %d) Unknown", detectedId.id));
+            telemetry.addLine(String.format("Center %6.0f %6.0f   (pixels)", detectedId.center.x, detectedId.center.y));
         }
-        return null;
     }
 
-    /**
-     * Get specific AprilTag by ID
-     */
     public AprilTagDetection getTagBySpecificId(int id) {
-        List<AprilTagDetection> detections = getAllDetections();
-
-        if (detections != null) {
-            for (AprilTagDetection detection : detections) {
-                if (detection.id == id) {
-                    return detection;
-                }
+        for (AprilTagDetection detection : detectedTags) {
+            if (detection.id == id) {
+                return detection;
             }
         }
-
         return null;
     }
 
-    /**
-     * Display detection info on telemetry
-     */
-    public void displayDetectionTelemetry(AprilTagDetection detection) {
-        if (telemetry == null || detection == null) return;
-
-        telemetry.addLine("─────────────");
-        telemetry.addData("Tag ID", detection.id);
-
-        if (detection.ftcPose != null) {
-            telemetry.addData("Range", "%.2f inches", detection.ftcPose.range);
-            telemetry.addData("Bearing", "%.2f degrees", detection.ftcPose.bearing);
-            telemetry.addData("Yaw", "%.2f degrees", detection.ftcPose.yaw);
-            telemetry.addData("X", "%.2f inches", detection.ftcPose.x);
-            telemetry.addData("Y", "%.2f inches", detection.ftcPose.y);
-            telemetry.addData("Z", "%.2f inches", detection.ftcPose.z);
-        }
-    }
-
-    /**
-     * Stop the vision system
-     */
     public void stop() {
         if (visionPortal != null) {
             visionPortal.close();
         }
-    }
-
-    /**
-     * Check if vision system is active
-     */
-    public boolean isActive() {
-        return visionPortal != null;
     }
 }
