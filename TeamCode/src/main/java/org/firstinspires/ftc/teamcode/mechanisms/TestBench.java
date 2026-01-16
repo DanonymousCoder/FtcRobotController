@@ -55,4 +55,22 @@ public class TestBench {
         setLeft_driveSpeed(leftPower);
         setRight_driveSpeed(rightPower);
     }
+
+    public int getLeftEncoder() {
+        return left_drive.getCurrentPosition();
+    }
+
+    public int getRightEncoder() {
+        return right_drive.getCurrentPosition();
+    }
+
+    // Useful for resetting encoders at the start of Auto
+    public void resetEncoders() {
+        left_drive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        right_drive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
+        // We use RUN_WITHOUT_ENCODER because we are doing the PID control ourselves
+        left_drive.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        right_drive.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+    }
 }
